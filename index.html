@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Budget — AI Travel Budget Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --navy: #0B1E3D;
+    --navy-soft: #5B6B85;
+    --cyan: #22D3EE;
+    --cyan-deep: #0EA5E9;
+    --teal: #14B8A6;
+    --bg: #F8FAFC;
+    --card-bg: rgba(255,255,255,0.7);
+    --card-border: rgba(15,30,61,0.09);
+    --shadow: 0 20px 45px -28px rgba(15,23,42,0.35);
+    --amber: #F59E0B;
+    --green: #10B981;
+    --purple: #8B5CF6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--navy);
+    position: relative;
+    min-height: 100vh;
+  }
+  h1, h2, h3, .display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+
+  .glow { position: fixed; border-radius: 50%; filter: blur(90px); z-index: -1; pointer-events: none; }
+  .glow-1 { width: 480px; height: 480px; top: -160px; left: -140px; background: radial-gradient(circle, rgba(34,211,238,0.28), transparent 70%); }
+  .glow-2 { width: 520px; height: 520px; top: 30%; right: -220px; background: radial-gradient(circle, rgba(14,165,233,0.20), transparent 70%); }
+  .glow-3 { width: 420px; height: 420px; bottom: -180px; left: 20%; background: radial-gradient(circle, rgba(20,184,166,0.16), transparent 70%); }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(15,30,61,0.15); border-radius: 10px; }
+
+  .glass-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; box-shadow: var(--shadow); backdrop-filter: blur(16px); }
+
+  a { color: var(--cyan-deep); }
+
+  /* ---------- Home Screen ---------- */
+  #screen-home { flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 24px; }
+  .home-inner { max-width: 620px; display: flex; flex-direction: column; align-items: center; }
+  .compass-mark { width: 108px; height: 108px; margin-bottom: 22px; }
+  .home-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--cyan-deep); margin-bottom: 14px; }
+  .home-title { font-size: 56px; font-weight: 700; line-height: 1.02; letter-spacing: -1px; }
+  .home-title .grad { background: linear-gradient(120deg, var(--cyan-deep), var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .home-sub { font-size: 17px; color: var(--navy-soft); margin-top: 16px; font-weight: 500; max-width: 420px; }
+  .home-bonus { display: inline-block; margin-top: 20px; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 999px; letter-spacing: 0.5px; background: rgba(34,211,238,0.12); color: var(--cyan-deep); }
+  .btn-primary { margin-top: 30px; border: none; cursor: pointer; padding: 15px 34px; border-radius: 14px; font-size: 15px; font-weight: 600; background: linear-gradient(120deg, var(--cyan-deep), var(--teal)); color: #fff; box-shadow: 0 14px 30px -14px rgba(14,165,233,0.6); transition: transform 0.2s ease; font-family: inherit; }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-primary:focus-visible, .btn-ghost:focus-visible, .style-card:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--cyan-deep); outline-offset: 2px; }
+  .btn-ghost { margin-top: 14px; border: none; cursor: pointer; background: transparent; color: var(--navy-soft); font-size: 13px; font-weight: 600; text-decoration: underline; font-family: inherit; }
+
+  /* ---------- App Shell (shared) ---------- */
+  .app-shell { flex-direction: column; width: 100%; max-width: 640px; margin: 0 auto; padding: 28px 24px 60px; }
+  .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .topbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan-deep); }
+  .topbar .logo-text { font-size: 15px; font-weight: 700; }
+  .topbar .logo-sub { color: var(--navy-soft); font-weight: 500; font-size: 12.5px; }
+
+  /* ---------- Input Form ---------- */
+  .form-card { padding: 22px 24px; margin-bottom: 16px; }
+  .field-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--navy-soft); margin-bottom: 10px; display: block; }
+  .field-hint { font-size: 12px; color: var(--navy-soft); margin-top: 8px; line-height: 1.5; }
+
+  select, input[type="number"] {
+    width: 100%; font-family: inherit; font-size: 14.5px; color: var(--navy);
+    padding: 12px 14px; border-radius: 12px; border: 1px solid var(--card-border);
+    background: #fff; outline: none; appearance: none;
+  }
+  select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'><path fill='%235B6B85' d='M7 10l5 5 5-5z'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .row-2 { grid-template-columns: 1fr; } }
+
+  .share-toggle { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13.5px; color: var(--navy-soft); }
+  .share-toggle input { width: 16px; height: 16px; accent-color: var(--cyan-deep); }
+
+  .style-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 480px) { .style-grid { grid-template-columns: 1fr; } }
+  .style-card {
+    border: 1.5px solid var(--card-border); border-radius: 14px; padding: 14px 12px; cursor: pointer;
+    background: #fff; text-align: left; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .style-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -16px rgba(15,23,42,0.3); }
+  .style-card.selected { border-color: transparent; background: linear-gradient(120deg, rgba(14,165,233,0.10), rgba(20,184,166,0.10)); box-shadow: inset 0 0 0 2px var(--cyan-deep); }
+  .style-card .style-emoji { font-size: 20px; margin-bottom: 6px; display: block; }
+  .style-card .style-name { font-size: 13.5px; font-weight: 700; display: block; margin-bottom: 3px; }
+  .style-card .style-desc { font-size: 11.5px; color: var(--navy-soft); line-height: 1.4; }
+
+  .calc-btn-row { position: sticky; bottom: 16px; margin-top: 8px; }
+  .calc-btn-row .btn-primary { width: 100%; margin-top: 0; }
+
+  .error-msg { font-size: 12.5px; color: #dc2626; margin-top: 8px; display: none; }
+  .error-msg.show { display: block; }
+
+  /* ---------- Results Screen ---------- */
+  .result-summary { padding: 26px 24px; margin-bottom: 16px; text-align: center; }
+  .result-trip-label { font-size: 12.5px; color: var(--navy-soft); font-weight: 600; margin-bottom: 6px; }
+  .result-total { font-size: 44px; font-weight: 700; letter-spacing: -1px; background: linear-gradient(120deg, var(--cyan-deep), var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .result-total-label { font-size: 12px; color: var(--navy-soft); margin-top: 2px; }
+  .result-stats-row { display: flex; justify-content: center; gap: 28px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+  .result-stat { text-align: center; }
+  .result-stat .stat-value { font-size: 18px; font-weight: 700; color: var(--navy); }
+  .result-stat .stat-label { font-size: 11px; color: var(--navy-soft); margin-top: 2px; }
+
+  .breakdown-card { padding: 20px 22px; margin-bottom: 16px; }
+  .breakdown-title { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--navy-soft); margin-bottom: 16px; }
+  .breakdown-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(15,30,61,0.06); }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .breakdown-mid { flex: 1; min-width: 0; }
+  .breakdown-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
+  .breakdown-label { font-size: 13.5px; font-weight: 700; }
+  .breakdown-amount { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+  .breakdown-bar-track { height: 7px; border-radius: 999px; background: rgba(15,30,61,0.07); overflow: hidden; }
+  .breakdown-bar-fill { height: 100%; border-radius: 999px; width: 0%; transition: width 1s cubic-bezier(0.16, 1, 0.3, 1); }
+  .breakdown-ring { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+  .breakdown-ring::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--bg); }
+  .breakdown-pct { position: relative; font-size: 10px; font-weight: 700; color: var(--navy); z-index: 1; }
+
+  .insight-banner { padding: 16px 20px; border-radius: 14px; background: linear-gradient(120deg, rgba(11,30,61,0.94), rgba(14,60,90,0.94)); color: #fff; margin-bottom: 16px; }
+  .insight-banner .insight-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cyan); margin-bottom: 6px; }
+  .insight-banner p { font-size: 13px; line-height: 1.6; color: rgba(255,255,255,0.9); }
+
+  .disclaimer { font-size: 11.5px; color: var(--navy-soft); line-height: 1.6; margin-bottom: 20px; padding: 0 4px; }
+
+  .action-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .btn-secondary { flex: 1; border: 1.5px solid var(--card-border); background: #fff; cursor: pointer; padding: 13px; border-radius: 12px; font-size: 13.5px; font-weight: 600; color: var(--navy); font-family: inherit; }
+  .action-row .btn-primary { flex: 1; margin-top: 0; padding: 13px; }
+
+  .cta-banner { padding: 14px 18px; border-radius: 14px; background: linear-gradient(120deg, rgba(11,30,61,0.94), rgba(14,60,90,0.94)); color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .cta-banner span.title { font-size: 13px; font-weight: 600; display: block; }
+  .cta-banner span.desc { font-size: 11.5px; color: rgba(255,255,255,0.65); }
+  .cta-pill { font-size: 11px; font-weight: 700; padding: 7px 14px; border-radius: 999px; background: linear-gradient(120deg, var(--cyan), var(--teal)); color: #04121f; flex-shrink: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .breakdown-bar-fill { transition: none; }
+    * { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+<div class="glow glow-3"></div>
+
+<!-- HOME SCREEN -->
+<div id="screen-home" class="screen active">
+  <div class="home-inner">
+    <svg class="compass-mark" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="cgrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0EA5E9"/>
+          <stop offset="100%" stop-color="#14B8A6"/>
+        </linearGradient>
+      </defs>
+      <circle cx="60" cy="52" r="34" stroke="url(#cgrad)" stroke-width="4" fill="#fff"/>
+      <path d="M60 8 L66 40 L60 34 L54 40 Z" fill="#0B1E3D"/>
+      <path d="M60 96 L66 64 L60 70 L54 64 Z" fill="#0B1E3D"/>
+      <path d="M60 30 L44 52 L60 74 L76 52 Z" fill="url(#cgrad)" opacity="0.85"/>
+      <rect x="38" y="66" width="44" height="32" rx="6" fill="#0B1E3D"/>
+      <rect x="38" y="66" width="44" height="10" rx="6" fill="#0B1E3D"/>
+      <circle cx="72" cy="82" r="3.2" fill="#22D3EE"/>
+    </svg>
+    <p class="home-eyebrow">AI Travel Budget Calculator</p>
+    <h1 class="home-title">SMART<br/><span class="grad">BUDGET</span></h1>
+    <p class="home-sub">Know your trip cost before you go. Plan smarter, travel further.</p>
+    <div class="home-bonus">Bonus #2 inside AI Travel Blueprint</div>
+    <button class="btn-primary" onclick="goTo('input')">Calculate My Budget</button>
+  </div>
+</div>
+
+<!-- INPUT SCREEN -->
+<div id="screen-input" class="screen">
+  <div class="app-shell">
+    <div class="topbar">
+      <span class="dot"></span>
+      <span class="logo-text">Smart Budget</span>
+      <span class="logo-sub">— trip details</span>
+    </div>
+
+    <div class="glass-card form-card">
+      <label class="field-label" for="originSelect">Where are you flying from?</label>
+      <select id="originSelect">
+        <option value="">Skip flight cost</option>
+        <option value="North America">North America</option>
+        <option value="Central & South America">Central &amp; South America</option>
+        <option value="Europe">Europe</option>
+        <option value="Middle East">Middle East</option>
+        <option value="Africa">Africa</option>
+        <option value="South Asia">South Asia</option>
+        <option value="East & Southeast Asia">East &amp; Southeast Asia</option>
+        <option value="Oceania">Oceania</option>
+      </select>
+      <p class="field-hint">Used only to give a rough flight estimate. Pick "Skip" to budget ground costs only.</p>
+    </div>
+
+    <div class="glass-card form-card">
+      <label class="field-label" for="destSelect">Where are you going?</label>
+      <select id="destSelect"></select>
+      <p class="field-hint">Don't see your exact city? Pick the closest region near the bottom of the list — the estimate will just be a bit more general.</p>
+    </div>
+
+    <div class="glass-card form-card">
+      <div class="row-2">
+        <div>
+          <label class="field-label" for="nightsInput">Nights</label>
+          <input type="number" id="nightsInput" min="1" max="90" value="7" />
+        </div>
+        <div>
+          <label class="field-label" for="travelersInput">Travelers</label>
+          <input type="number" id="travelersInput" min="1" max="10" value="1" />
+        </div>
+      </div>
+      <div class="share-toggle" id="shareToggleRow" style="display:none;">
+        <input type="checkbox" id="shareToggle" checked />
+        <label for="shareToggle">We're sharing accommodation (splitting rooms)</label>
+      </div>
+    </div>
+
+    <div class="glass-card form-card">
+      <label class="field-label">Travel style</label>
+      <div class="style-grid" id="styleGrid">
+        <button class="style-card selected" data-style="budget" tabindex="0">
+          <span class="style-emoji">🎒</span>
+          <span class="style-name">Budget</span>
+          <span class="style-desc">Hostels, street food, public transit</span>
+        </button>
+        <button class="style-card" data-style="mid" tabindex="0">
+          <span class="style-emoji">🧳</span>
+          <span class="style-name">Mid-range</span>
+          <span class="style-desc">3-star stays, mix of eating out & local</span>
+        </button>
+        <button class="style-card" data-style="comfort" tabindex="0">
+          <span class="style-emoji">🥂</span>
+          <span class="style-name">Comfort</span>
+          <span class="style-desc">4-star+ stays, restaurants, private transport</span>
+        </button>
+      </div>
+    </div>
+
+    <p class="error-msg" id="formError">Please enter at least 1 night and 1 traveler.</p>
+
+    <div class="calc-btn-row">
+      <button class="btn-primary" onclick="handleCalculate()">Calculate My Budget</button>
+    </div>
+    <div style="text-align:center;">
+      <button class="btn-ghost" onclick="goTo('home')">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div id="screen-results" class="screen">
+  <div class="app-shell">
+    <div class="topbar">
+      <span class="dot"></span>
+      <span class="logo-text">Smart Budget</span>
+      <span class="logo-sub">— your estimate</span>
+    </div>
+
+    <div class="glass-card result-summary">
+      <p class="result-trip-label" id="resultTripLabel"></p>
+      <div class="result-total" id="resultTotal">$0</div>
+      <div class="result-total-label">estimated total trip cost</div>
+      <div class="result-stats-row">
+        <div class="result-stat">
+          <div class="stat-value" id="statDailyPerson">$0</div>
+          <div class="stat-label">per person / day on the ground</div>
+        </div>
+        <div class="result-stat">
+          <div class="stat-value" id="statBuffer">$0</div>
+          <div class="stat-label">buffer included (18%)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card breakdown-card">
+      <p class="breakdown-title">Cost Breakdown</p>
+      <div id="breakdownList"></div>
+    </div>
+
+    <div class="insight-banner">
+      <p class="insight-label">Where This Usually Runs Over</p>
+      <p id="insightText"></p>
+    </div>
+
+    <p class="disclaimer">This is a planning estimate built from typical costs for this kind of trip — not a live quote. Prices shift by season, booking timing, and exact choices. Use it as your Chapter 7 starting point, then check real flight and hotel prices before you commit.</p>
+
+    <div class="action-row">
+      <button class="btn-secondary" onclick="goTo('input')">Adjust Details</button>
+      <button class="btn-primary" onclick="startOver()">Start Over</button>
+    </div>
+
+    <div class="cta-banner">
+      <div><span class="title">Want this run automatically?</span><span class="desc">NavGate OS will build your full budget without the form.</span></div>
+      <div class="cta-pill">Coming Soon</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= DATA ================= */
+
+// [name, flightRegion, dailyCost] — dailyCost = blended mid-range daily figure (USD)
+// covering accommodation-per-room + food/transport/activities-per-person, before style multiplier.
+const DESTINATIONS = [
+  // North America
+  ["New York, USA","North America",180],["Los Angeles, USA","North America",150],
+  ["Miami, USA","North America",140],["Las Vegas, USA","North America",135],
+  ["San Francisco, USA","North America",170],["Toronto, Canada","North America",130],
+  ["Vancouver, Canada","North America",125],["Mexico City, Mexico","North America",60],
+  ["Cancun, Mexico","North America",95],
+  // Central & South America
+  ["Rio de Janeiro, Brazil","Central & South America",70],["Buenos Aires, Argentina","Central & South America",55],
+  ["Lima, Peru","Central & South America",50],["Bogota, Colombia","Central & South America",45],
+  ["Santiago, Chile","Central & South America",65],["Cusco, Peru","Central & South America",45],
+  ["San Jose, Costa Rica","Central & South America",75],["Punta Cana, Dominican Republic","Central & South America",100],
+  ["Havana, Cuba","Central & South America",60],
+  // Europe
+  ["Paris, France","Europe",160],["London, UK","Europe",170],["Rome, Italy","Europe",130],
+  ["Barcelona, Spain","Europe",120],["Madrid, Spain","Europe",115],["Amsterdam, Netherlands","Europe",150],
+  ["Berlin, Germany","Europe",110],["Vienna, Austria","Europe",120],["Zurich, Switzerland","Europe",200],
+  ["Lisbon, Portugal","Europe",95],["Dublin, Ireland","Europe",140],["Venice, Italy","Europe",140],
+  ["Florence, Italy","Europe",120],["Milan, Italy","Europe",130],["Prague, Czechia","Europe",80],
+  ["Budapest, Hungary","Europe",75],["Warsaw, Poland","Europe",70],["Krakow, Poland","Europe",65],
+  ["Bucharest, Romania","Europe",60],["Copenhagen, Denmark","Europe",170],["Stockholm, Sweden","Europe",160],
+  ["Oslo, Norway","Europe",180],["Reykjavik, Iceland","Europe",180],["Helsinki, Finland","Europe",150],
+  ["Athens, Greece","Europe",90],["Santorini, Greece","Europe",130],["Dubrovnik, Croatia","Europe",120],
+  ["Malta","Europe",100],
+  // Middle East
+  ["Dubai, UAE","Middle East",160],["Abu Dhabi, UAE","Middle East",150],["Doha, Qatar","Middle East",140],
+  ["Tel Aviv, Israel","Middle East",150],["Istanbul, Turkey","Middle East",70],["Amman, Jordan","Middle East",75],
+  // Africa
+  ["Marrakech, Morocco","Africa",55],["Cairo, Egypt","Africa",45],["Cape Town, South Africa","Africa",65],
+  ["Nairobi, Kenya","Africa",60],["Zanzibar, Tanzania","Africa",70],["Casablanca, Morocco","Africa",60],
+  // South Asia
+  ["Delhi, India","South Asia",40],["Mumbai, India","South Asia",50],["Jaipur, India","South Asia",35],
+  ["Kathmandu, Nepal","South Asia",30],["Colombo, Sri Lanka","South Asia",45],
+  // East & Southeast Asia
+  ["Bangkok, Thailand","East & Southeast Asia",55],["Chiang Mai, Thailand","East & Southeast Asia",40],
+  ["Bali, Indonesia","East & Southeast Asia",55],["Hanoi, Vietnam","East & Southeast Asia",40],
+  ["Ho Chi Minh City, Vietnam","East & Southeast Asia",40],["Siem Reap, Cambodia","East & Southeast Asia",35],
+  ["Manila, Philippines","East & Southeast Asia",50],["Kuala Lumpur, Malaysia","East & Southeast Asia",50],
+  ["Singapore","East & Southeast Asia",130],["Luang Prabang, Laos","East & Southeast Asia",35],
+  ["Tokyo, Japan","East & Southeast Asia",130],["Osaka, Japan","East & Southeast Asia",110],
+  ["Kyoto, Japan","East & Southeast Asia",115],["Seoul, South Korea","East & Southeast Asia",100],
+  ["Shanghai, China","East & Southeast Asia",90],["Beijing, China","East & Southeast Asia",85],
+  ["Hong Kong","East & Southeast Asia",130],["Taipei, Taiwan","East & Southeast Asia",80],
+  // Oceania
+  ["Sydney, Australia","Oceania",150],["Melbourne, Australia","Oceania",140],["Auckland, New Zealand","Oceania",130],
+  ["Queenstown, New Zealand","Oceania",140],["Nadi, Fiji","Oceania",120],["Bora Bora, French Polynesia","Oceania",250],
+];
+
+const REGIONS_FALLBACK = [
+  ["North America (region)","North America",140],
+  ["Central America & Caribbean (region)","Central & South America",90],
+  ["South America (region)","Central & South America",55],
+  ["Western Europe (region)","Europe",130],
+  ["Eastern Europe (region)","Europe",70],
+  ["Nordic & Baltics (region)","Europe",165],
+  ["Mediterranean & Southern Europe (region)","Europe",110],
+  ["Middle East (region)","Middle East",130],
+  ["North Africa (region)","Africa",55],
+  ["Sub-Saharan Africa (region)","Africa",60],
+  ["South Asia (region)","South Asia",40],
+  ["Southeast Asia (region)","East & Southeast Asia",45],
+  ["East Asia (region)","East & Southeast Asia",100],
+  ["Oceania & Pacific Islands (region)","Oceania",140],
+];
+
+// Round-trip economy, mid-range baseline flight cost between flight regions (USD)
+const FLIGHT_REGIONS = ["North America","Central & South America","Europe","Middle East","Africa","South Asia","East & Southeast Asia","Oceania"];
+const FLIGHT_MATRIX = {
+  "North America|North America": 150, "Central & South America|Central & South America": 150,
+  "Europe|Europe": 150, "Middle East|Middle East": 150, "Africa|Africa": 150,
+  "South Asia|South Asia": 150, "East & Southeast Asia|East & Southeast Asia": 150, "Oceania|Oceania": 150,
+  "North America|Central & South America": 450, "North America|Europe": 650, "North America|Middle East": 900,
+  "North America|Africa": 1000, "North America|South Asia": 1100, "North America|East & Southeast Asia": 1000,
+  "North America|Oceania": 1200,
+  "Central & South America|Europe": 800, "Central & South America|Middle East": 1100,
+  "Central & South America|Africa": 1300, "Central & South America|South Asia": 1400,
+  "Central & South America|East & Southeast Asia": 1500, "Central & South America|Oceania": 1600,
+  "Europe|Middle East": 400, "Europe|Africa": 500, "Europe|South Asia": 600,
+  "Europe|East & Southeast Asia": 700, "Europe|Oceania": 900,
+  "Middle East|Africa": 450, "Middle East|South Asia": 350, "Middle East|East & Southeast Asia": 550,
+  "Middle East|Oceania": 800,
+  "Africa|South Asia": 600, "Africa|East & Southeast Asia": 800, "Africa|Oceania": 1000,
+  "South Asia|East & Southeast Asia": 400, "South Asia|Oceania": 700,
+  "East & Southeast Asia|Oceania": 500,
+};
+
+function getFlightCost(originRegion, destRegion) {
+  if (!originRegion) return null;
+  const key1 = `${originRegion}|${destRegion}`;
+  const key2 = `${destRegion}|${originRegion}`;
+  if (FLIGHT_MATRIX[key1] !== undefined) return FLIGHT_MATRIX[key1];
+  if (FLIGHT_MATRIX[key2] !== undefined) return FLIGHT_MATRIX[key2];
+  return 700; // fallback, shouldn't normally hit
+}
+
+const STYLES = {
+  budget:  { label: "Budget",    groundMult: 0.60, flightMult: 0.75 },
+  mid:     { label: "Mid-range", groundMult: 1.00, flightMult: 1.00 },
+  comfort: { label: "Comfort",   groundMult: 1.85, flightMult: 1.60 },
+};
+
+const CATEGORY_SPLIT = { accommodation: 0.38, food: 0.24, transport: 0.13, activities: 0.25 };
+
+const CATEGORY_META = {
+  flights:       { label: "Flights",       icon: "✈️", color: "#0EA5E9" },
+  accommodation: { label: "Accommodation", icon: "🏨", color: "#14B8A6" },
+  food:          { label: "Food",          icon: "🍜", color: "#F59E0B" },
+  transport:     { label: "Transport",     icon: "🚆", color: "#8B5CF6" },
+  activities:    { label: "Activities",    icon: "🎟️", color: "#10B981" },
+  buffer:        { label: "Buffer",        icon: "🛡️", color: "#5B6B85" },
+};
+
+const INSIGHTS = {
+  budget: "Budget trips usually go over on food and activities, not the big bookings — small daily choices add up faster than people expect. Your buffer is there for exactly this.",
+  mid: "Mid-range trips most often creep over on activities and local transport — one extra tour, one extra taxi ride at a time. Keep half an eye on those two.",
+  comfort: "Even comfort-focused trips get hit by activities and dining upgrades that weren't part of the original plan. The buffer matters here too — don't skip it just because the rest is booked.",
+};
+
+/* ================= STATE ================= */
+const state = { style: "budget" };
+
+/* ================= INIT ================= */
+function populateDestinations() {
+  const sel = document.getElementById("destSelect");
+  const cityGroup = document.createElement("optgroup");
+  cityGroup.label = "Popular destinations";
+  DESTINATIONS.forEach((d, i) => {
+    const opt = document.createElement("option");
+    opt.value = `city-${i}`;
+    opt.textContent = d[0];
+    cityGroup.appendChild(opt);
+  });
+  const regionGroup = document.createElement("optgroup");
+  regionGroup.label = "Or pick the closest region";
+  REGIONS_FALLBACK.forEach((r, i) => {
+    const opt = document.createElement("option");
+    opt.value = `region-${i}`;
+    opt.textContent = r[0];
+    regionGroup.appendChild(opt);
+  });
+  sel.appendChild(cityGroup);
+  sel.appendChild(regionGroup);
+}
+populateDestinations();
+
+function getDestinationData(value) {
+  if (value.startsWith("city-")) {
+    const idx = parseInt(value.split("-")[1], 10);
+    const [name, flightRegion, dailyCost] = DESTINATIONS[idx];
+    return { name, flightRegion, dailyCost };
+  } else {
+    const idx = parseInt(value.split("-")[1], 10);
+    const [name, flightRegion, dailyCost] = REGIONS_FALLBACK[idx];
+    return { name, flightRegion, dailyCost };
+  }
+}
+
+/* ================= NAVIGATION ================= */
+function goTo(screenId) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + screenId).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+function startOver() {
+  document.getElementById("nightsInput").value = 7;
+  document.getElementById("travelersInput").value = 1;
+  document.getElementById("shareToggle").checked = true;
+  document.getElementById("shareToggleRow").style.display = "none";
+  document.getElementById("originSelect").value = "";
+  selectStyle("budget");
+  goTo("home");
+}
+
+/* ================= STYLE CARD SELECTION ================= */
+document.getElementById("styleGrid").addEventListener("click", (e) => {
+  const card = e.target.closest(".style-card");
+  if (!card) return;
+  selectStyle(card.dataset.style);
+});
+document.getElementById("styleGrid").addEventListener("keydown", (e) => {
+  const card = e.target.closest(".style-card");
+  if (!card) return;
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectStyle(card.dataset.style); }
+});
+function selectStyle(styleKey) {
+  state.style = styleKey;
+  document.querySelectorAll(".style-card").forEach(c => {
+    c.classList.toggle("selected", c.dataset.style === styleKey);
+  });
+}
+
+/* ================= TRAVELERS -> SHOW/HIDE SHARE TOGGLE ================= */
+document.getElementById("travelersInput").addEventListener("input", () => {
+  const travelers = parseInt(document.getElementById("travelersInput").value, 10) || 1;
+  document.getElementById("shareToggleRow").style.display = travelers > 1 ? "flex" : "none";
+});
+
+/* ================= CALCULATION ================= */
+function calculateBudget(inputs) {
+  const { destValue, originRegion, nights, travelers, sharing, styleKey } = inputs;
+  const dest = getDestinationData(destValue);
+  const style = STYLES[styleKey];
+
+  const rooms = sharing ? Math.ceil(travelers / 2) : travelers;
+
+  const accommodation = dest.dailyCost * CATEGORY_SPLIT.accommodation * style.groundMult * rooms * nights;
+  const food = dest.dailyCost * CATEGORY_SPLIT.food * style.groundMult * travelers * nights;
+  const transport = dest.dailyCost * CATEGORY_SPLIT.transport * style.groundMult * travelers * nights;
+  const activities = dest.dailyCost * CATEGORY_SPLIT.activities * style.groundMult * travelers * nights;
+
+  let flights = 0;
+  if (originRegion) {
+    const flightBase = getFlightCost(originRegion, dest.flightRegion);
+    flights = flightBase * style.flightMult * travelers;
+  }
+
+  const subtotal = accommodation + food + transport + activities + flights;
+  const buffer = subtotal * 0.18;
+  const total = subtotal + buffer;
+
+  const groundDaily = (accommodation + food + transport + activities) / nights;
+  const groundDailyPerPerson = groundDaily / travelers;
+
+  return {
+    destName: dest.name, styleLabel: style.label, nights, travelers,
+    categories: { flights, accommodation, food, transport, activities, buffer },
+    subtotal, total, groundDailyPerPerson,
+  };
+}
+
+/* ================= HANDLE CALCULATE ================= */
+function handleCalculate() {
+  const destValue = document.getElementById("destSelect").value;
+  const originRegion = document.getElementById("originSelect").value;
+  const nights = parseInt(document.getElementById("nightsInput").value, 10);
+  const travelers = parseInt(document.getElementById("travelersInput").value, 10);
+  const sharing = document.getElementById("shareToggle").checked;
+
+  const errorEl = document.getElementById("formError");
+  if (!nights || nights < 1 || !travelers || travelers < 1) {
+    errorEl.classList.add("show");
+    return;
+  }
+  errorEl.classList.remove("show");
+
+  const result = calculateBudget({ destValue, originRegion, nights, travelers, sharing, styleKey: state.style });
+  renderResults(result);
+  goTo("results");
+}
+
+/* ================= RENDER RESULTS ================= */
+function formatUSD(n) {
+  return "$" + Math.round(n).toLocaleString();
+}
+
+function animateNumber(el, target, duration = 900) {
+  const start = 0;
+  const startTime = performance.now();
+  function tick(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = Math.round(start + (target - start) * eased);
+    el.textContent = formatUSD(value);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function renderResults(result) {
+  document.getElementById("resultTripLabel").textContent =
+    `${result.destName} · ${result.nights} night${result.nights === 1 ? "" : "s"} · ${result.travelers} traveler${result.travelers === 1 ? "" : "s"} · ${result.styleLabel}`;
+
+  animateNumber(document.getElementById("resultTotal"), result.total);
+  document.getElementById("statDailyPerson").textContent = formatUSD(result.groundDailyPerPerson);
+  document.getElementById("statBuffer").textContent = formatUSD(result.categories.buffer);
+
+  const order = ["flights", "accommodation", "food", "transport", "activities", "buffer"];
+  const list = document.getElementById("breakdownList");
+  list.innerHTML = "";
+
+  order.forEach(key => {
+    const amount = result.categories[key];
+    if (key === "flights" && amount === 0) return; // skip if flights were excluded
+    const pct = Math.round((amount / result.total) * 100);
+    const meta = CATEGORY_META[key];
+
+    const row = document.createElement("div");
+    row.className = "breakdown-row";
+    row.innerHTML = `
+      <div class="breakdown-icon" style="background:${meta.color}1A;">${meta.icon}</div>
+      <div class="breakdown-mid">
+        <div class="breakdown-label-row">
+          <span class="breakdown-label">${meta.label}</span>
+          <span class="breakdown-amount">${formatUSD(amount)}</span>
+        </div>
+        <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="background:${meta.color};" data-target="${pct}"></div></div>
+      </div>
+      <div class="breakdown-ring" style="background: conic-gradient(${meta.color} 0deg, ${meta.color} 0deg, rgba(15,30,61,0.07) 0deg);" data-pct="${pct}" data-color="${meta.color}">
+        <span class="breakdown-pct">${pct}%</span>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  // trigger bar + ring animation on next frame
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.querySelectorAll(".breakdown-bar-fill").forEach(bar => {
+        bar.style.width = bar.dataset.target + "%";
+      });
+      document.querySelectorAll(".breakdown-ring").forEach(ring => {
+        const pct = parseFloat(ring.dataset.pct);
+        const color = ring.dataset.color;
+        const deg = (pct / 100) * 360;
+        ring.style.transition = "background 1s cubic-bezier(0.16,1,0.3,1)";
+        ring.style.background = `conic-gradient(${color} ${deg}deg, rgba(15,30,61,0.07) ${deg}deg)`;
+      });
+    });
+  });
+
+  document.getElementById("insightText").textContent = INSIGHTS[state.style === "budget" ? "budget" : (state.style === "comfort" ? "comfort" : "mid")];
+}
+</script>
+</body>
+</html>
