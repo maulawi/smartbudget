@@ -115,9 +115,26 @@
   .result-stat .stat-label { font-size: 11px; color: var(--navy-soft); margin-top: 2px; }
 
   .breakdown-card { padding: 20px 22px; margin-bottom: 16px; }
-  .breakdown-title { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--navy-soft); margin-bottom: 16px; }
-  .breakdown-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(15,30,61,0.06); }
+  .breakdown-title { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--navy-soft); margin-bottom: 4px; }
+  .breakdown-subtitle { font-size: 11.5px; color: var(--navy-soft); margin-bottom: 14px; }
+  .breakdown-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(15,30,61,0.06); cursor: pointer; }
   .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-chevron { font-size: 11px; color: var(--navy-soft); transition: transform 0.2s ease; flex-shrink: 0; }
+  .breakdown-row.expanded .breakdown-chevron { transform: rotate(90deg); }
+  .breakdown-detail { display: none; padding: 6px 0 16px 52px; }
+  .breakdown-detail.open { display: block; }
+  .tier-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed rgba(15,30,61,0.08); gap: 10px; }
+  .tier-row:last-child { border-bottom: none; }
+  .tier-row.tier-current { background: rgba(20,184,166,0.07); border-radius: 8px; padding: 7px 8px; margin: 0 -8px; }
+  .tier-name { font-size: 12.5px; font-weight: 600; color: var(--navy); }
+  .tier-badge { font-size: 9.5px; font-weight: 700; color: #0d6b5c; background: rgba(20,184,166,0.16); padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
+  .tier-cost { font-size: 12.5px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+  .tier-cost .tier-unit { font-size: 10px; font-weight: 500; color: var(--navy-soft); margin-left: 3px; }
+  .tier-explain { font-size: 12.5px; color: var(--navy-soft); line-height: 1.6; }
+
+  .currency-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .currency-label { font-size: 11.5px; color: var(--navy-soft); font-weight: 600; }
+  #currencySelect { font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy); padding: 6px 10px; border-radius: 10px; border: 1px solid var(--card-border); background: #fff; }
   .breakdown-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
   .breakdown-mid { flex: 1; min-width: 0; }
   .breakdown-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
@@ -193,18 +210,8 @@
 
     <div class="glass-card form-card">
       <label class="field-label" for="originSelect">Where are you flying from?</label>
-      <select id="originSelect">
-        <option value="">Skip flight cost</option>
-        <option value="North America">North America</option>
-        <option value="Central & South America">Central &amp; South America</option>
-        <option value="Europe">Europe</option>
-        <option value="Middle East">Middle East</option>
-        <option value="Africa">Africa</option>
-        <option value="South Asia">South Asia</option>
-        <option value="East & Southeast Asia">East &amp; Southeast Asia</option>
-        <option value="Oceania">Oceania</option>
-      </select>
-      <p class="field-hint">Used only to give a rough flight estimate. Pick "Skip" to budget ground costs only.</p>
+      <select id="originSelect"></select>
+      <p class="field-hint">Pick "Skip flight cost" at the top if you'd rather budget ground costs only. Don't see your exact city? Pick the closest region instead.</p>
     </div>
 
     <div class="glass-card form-card">
@@ -272,6 +279,10 @@
     </div>
 
     <div class="glass-card result-summary">
+      <div class="currency-row">
+        <label for="currencySelect" class="currency-label">Show amounts in</label>
+        <select id="currencySelect"></select>
+      </div>
       <p class="result-trip-label" id="resultTripLabel"></p>
       <div class="result-total" id="resultTotal">$0</div>
       <div class="result-total-label">estimated total trip cost</div>
@@ -289,6 +300,7 @@
 
     <div class="glass-card breakdown-card">
       <p class="breakdown-title">Cost Breakdown</p>
+      <p class="breakdown-subtitle">Tap any category to see what it actually buys</p>
       <div id="breakdownList"></div>
     </div>
 
@@ -434,14 +446,101 @@ const INSIGHTS = {
   comfort: "Even comfort-focused trips get hit by activities and dining upgrades that weren't part of the original plan. The buffer matters here too — don't skip it just because the rest is booked.",
 };
 
+// Approximate mid-market rates, late July 2026 — for planning purposes only, not a live feed.
+// Rates drift; always check a live converter before actually exchanging money.
+const CURRENCIES = [
+  { code:"USD", symbol:"$",    name:"US Dollar",            rate:1,      decimals:2 },
+  { code:"EUR", symbol:"€",    name:"Euro",                 rate:0.874,  decimals:2 },
+  { code:"GBP", symbol:"£",    name:"British Pound",        rate:0.749,  decimals:2 },
+  { code:"MYR", symbol:"RM",   name:"Malaysian Ringgit",    rate:4.086,  decimals:2 },
+  { code:"JPY", symbol:"¥",    name:"Japanese Yen",         rate:163.5,  decimals:0 },
+  { code:"CNY", symbol:"¥",    name:"Chinese Yuan",         rate:6.76,   decimals:2 },
+  { code:"AUD", symbol:"A$",   name:"Australian Dollar",    rate:1.437,  decimals:2 },
+  { code:"CAD", symbol:"C$",   name:"Canadian Dollar",      rate:1.405,  decimals:2 },
+  { code:"CHF", symbol:"Fr",   name:"Swiss Franc",          rate:0.815,  decimals:2 },
+  { code:"SGD", symbol:"S$",   name:"Singapore Dollar",     rate:1.29,   decimals:2 },
+  { code:"HKD", symbol:"HK$",  name:"Hong Kong Dollar",     rate:7.843,  decimals:2 },
+  { code:"INR", symbol:"₹",    name:"Indian Rupee",         rate:95.7,   decimals:0 },
+  { code:"IDR", symbol:"Rp",   name:"Indonesian Rupiah",    rate:18065,  decimals:0 },
+  { code:"THB", symbol:"฿",    name:"Thai Baht",            rate:33.56,  decimals:2 },
+  { code:"PHP", symbol:"₱",    name:"Philippine Peso",      rate:61.4,   decimals:2 },
+  { code:"VND", symbol:"₫",    name:"Vietnamese Dong",      rate:25400,  decimals:0 },
+  { code:"KRW", symbol:"₩",    name:"South Korean Won",     rate:1400,   decimals:0 },
+  { code:"MXN", symbol:"MX$",  name:"Mexican Peso",         rate:17.45,  decimals:2 },
+  { code:"BRL", symbol:"R$",   name:"Brazilian Real",       rate:5.45,   decimals:2 },
+  { code:"ZAR", symbol:"R",    name:"South African Rand",   rate:16.7,   decimals:2 },
+  { code:"AED", symbol:"AED",  name:"UAE Dirham",           rate:3.6725, decimals:2 },
+  { code:"SAR", symbol:"SAR",  name:"Saudi Riyal",          rate:3.75,   decimals:2 },
+  { code:"NZD", symbol:"NZ$",  name:"New Zealand Dollar",   rate:1.721,  decimals:2 },
+  { code:"TRY", symbol:"₺",    name:"Turkish Lira",         rate:41,     decimals:2 },
+];
+
+// Sub-tier options per category, expressed as a multiplier of that category's
+// mid-range baseline (dest.dailyCost × its category-split share). Clicking a
+// breakdown row reveals these so a lump-sum number turns into real choices.
+const TIER_TABLES = {
+  accommodation: {
+    unit: "/ room / night",
+    tiers: [
+      { name:"Hostel Dorm",               mult:0.35 },
+      { name:"Budget Hotel / Guesthouse", mult:0.6 },
+      { name:"Mid-Range Hotel",           mult:1.0 },
+      { name:"Boutique / 4-Star",         mult:1.6 },
+      { name:"Luxury / 5-Star",           mult:2.8 },
+    ],
+  },
+  food: {
+    unit: "/ person / day",
+    tiers: [
+      { name:"Street Food & Local Eats", mult:0.5 },
+      { name:"Casual Restaurants",       mult:1.0 },
+      { name:"Mid-Range Restaurants",    mult:1.6 },
+      { name:"Fine Dining",              mult:3.0 },
+    ],
+  },
+  transport: {
+    unit: "/ person / day",
+    tiers: [
+      { name:"Public Transit / Bus",        mult:0.4 },
+      { name:"Shared Taxi / Tuk-Tuk",       mult:0.8 },
+      { name:"Private Taxi / Rideshare",    mult:1.5 },
+      { name:"Rental Car / Scooter",        mult:2.2 },
+    ],
+  },
+  activities: {
+    unit: "/ person / day",
+    tiers: [
+      { name:"Free & Self-Guided",         mult:0.2 },
+      { name:"Budget Tours & Sights",      mult:0.7 },
+      { name:"Standard Paid Attractions",  mult:1.0 },
+      { name:"Premium / Private Tours",    mult:2.5 },
+    ],
+  },
+  flights: {
+    unit: "/ person (round-trip)",
+    tiers: [
+      { name:"Budget / Basic Economy", mult:0.75 },
+      { name:"Standard Economy",       mult:1.0 },
+      { name:"Premium Economy",        mult:1.6 },
+      { name:"Business Class",         mult:3.5 },
+    ],
+  },
+};
+
 /* ================= STATE ================= */
-const state = { style: "budget" };
+const state = { style: "budget", currency: "USD", lastResult: null };
 
 /* ================= INIT ================= */
-function populateDestinations() {
-  const sel = document.getElementById("destSelect");
+function populateLocationSelect(selectId, includeSkipOption) {
+  const sel = document.getElementById(selectId);
+  if (includeSkipOption) {
+    const skipOpt = document.createElement("option");
+    skipOpt.value = "";
+    skipOpt.textContent = "Skip flight cost";
+    sel.appendChild(skipOpt);
+  }
   const cityGroup = document.createElement("optgroup");
-  cityGroup.label = "Popular destinations";
+  cityGroup.label = "Popular cities";
   DESTINATIONS.forEach((d, i) => {
     const opt = document.createElement("option");
     opt.value = `city-${i}`;
@@ -459,7 +558,8 @@ function populateDestinations() {
   sel.appendChild(cityGroup);
   sel.appendChild(regionGroup);
 }
-populateDestinations();
+populateLocationSelect("originSelect", true);
+populateLocationSelect("destSelect", false);
 
 function getDestinationData(value) {
   if (value.startsWith("city-")) {
@@ -516,8 +616,10 @@ document.getElementById("travelersInput").addEventListener("input", () => {
 
 /* ================= CALCULATION ================= */
 function calculateBudget(inputs) {
-  const { destValue, originRegion, nights, travelers, sharing, styleKey } = inputs;
+  const { destValue, originValue, nights, travelers, sharing, styleKey } = inputs;
   const dest = getDestinationData(destValue);
+  const originData = originValue ? getDestinationData(originValue) : null;
+  const originFlightRegion = originData ? originData.flightRegion : null;
   const style = STYLES[styleKey];
 
   const rooms = sharing ? Math.ceil(travelers / 2) : travelers;
@@ -528,8 +630,8 @@ function calculateBudget(inputs) {
   const activities = dest.dailyCost * CATEGORY_SPLIT.activities * style.groundMult * travelers * nights;
 
   let flights = 0;
-  if (originRegion) {
-    const flightBase = getFlightCost(originRegion, dest.flightRegion);
+  if (originFlightRegion) {
+    const flightBase = getFlightCost(originFlightRegion, dest.flightRegion);
     flights = flightBase * style.flightMult * travelers;
   }
 
@@ -541,7 +643,8 @@ function calculateBudget(inputs) {
   const groundDailyPerPerson = groundDaily / travelers;
 
   return {
-    destName: dest.name, styleLabel: style.label, nights, travelers,
+    destName: dest.name, styleLabel: style.label, styleKey, nights, travelers, rooms,
+    dest, originFlightRegion,
     categories: { flights, accommodation, food, transport, activities, buffer },
     subtotal, total, groundDailyPerPerson,
   };
@@ -550,7 +653,7 @@ function calculateBudget(inputs) {
 /* ================= HANDLE CALCULATE ================= */
 function handleCalculate() {
   const destValue = document.getElementById("destSelect").value;
-  const originRegion = document.getElementById("originSelect").value;
+  const originValue = document.getElementById("originSelect").value;
   const nights = parseInt(document.getElementById("nightsInput").value, 10);
   const travelers = parseInt(document.getElementById("travelersInput").value, 10);
   const sharing = document.getElementById("shareToggle").checked;
@@ -562,14 +665,18 @@ function handleCalculate() {
   }
   errorEl.classList.remove("show");
 
-  const result = calculateBudget({ destValue, originRegion, nights, travelers, sharing, styleKey: state.style });
+  const result = calculateBudget({ destValue, originValue, nights, travelers, sharing, styleKey: state.style });
+  state.lastResult = result;
   renderResults(result);
   goTo("results");
 }
 
 /* ================= RENDER RESULTS ================= */
-function formatUSD(n) {
-  return "$" + Math.round(n).toLocaleString();
+function formatMoney(usdAmount) {
+  const cur = CURRENCIES.find(c => c.code === state.currency) || CURRENCIES[0];
+  const converted = usdAmount * cur.rate;
+  const rounded = cur.decimals === 0 ? Math.round(converted) : Math.round(converted * 100) / 100;
+  return cur.symbol + rounded.toLocaleString(undefined, { minimumFractionDigits: cur.decimals, maximumFractionDigits: cur.decimals });
 }
 
 function animateNumber(el, target, duration = 900) {
@@ -579,10 +686,65 @@ function animateNumber(el, target, duration = 900) {
     const progress = Math.min((now - startTime) / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
     const value = Math.round(start + (target - start) * eased);
-    el.textContent = formatUSD(value);
+    el.textContent = formatMoney(value);
     if (progress < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+}
+
+function populateCurrencySelect() {
+  const sel = document.getElementById("currencySelect");
+  sel.innerHTML = CURRENCIES.map(c => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join("");
+  sel.value = state.currency;
+}
+
+function getTierBaseUSD(key, result) {
+  const { dest, originFlightRegion, styleKey } = result;
+  if (key === "flights") {
+    if (!originFlightRegion) return 0;
+    return getFlightCost(originFlightRegion, dest.flightRegion) * result.travelers;
+  }
+  const perUnit = dest.dailyCost * CATEGORY_SPLIT[key];
+  if (key === "accommodation") return perUnit * result.rooms * result.nights;
+  return perUnit * result.travelers * result.nights;
+}
+
+function getCurrentStyleMult(key, styleKey) {
+  const style = STYLES[styleKey];
+  return key === "flights" ? style.flightMult : style.groundMult;
+}
+
+function renderTierDetailHTML(key, result) {
+  if (key === "buffer") {
+    return `<p class="tier-explain">This 18% safety margin is sized to cover the small stuff that never makes it into a plan — an extra taxi ride, a forgotten museum ticket, a meal that ran over budget. It's not spare spending money on top of your trip; it's the buffer Chapter 7 of the guide recommends keeping under every category above.</p>`;
+  }
+  const table = TIER_TABLES[key];
+  if (!table) return "";
+  const baseUSD = getTierBaseUSD(key, result);
+  const currentMult = getCurrentStyleMult(key, result.styleKey);
+  let closestIdx = 0, closestDiff = Infinity;
+  table.tiers.forEach((t, i) => {
+    const diff = Math.abs(t.mult - currentMult);
+    if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
+  });
+  return table.tiers.map((t, i) => {
+    const costUSD = baseUSD * t.mult;
+    const isCurrent = i === closestIdx;
+    return `
+      <div class="tier-row ${isCurrent ? "tier-current" : ""}">
+        <span class="tier-name">${t.name}${isCurrent ? '<span class="tier-badge">≈ your pick</span>' : ""}</span>
+        <span class="tier-cost">${formatMoney(costUSD)}<span class="tier-unit">${table.unit}</span></span>
+      </div>
+    `;
+  }).join("");
+}
+
+function toggleBreakdownDetail(key) {
+  const row = document.getElementById("row-" + key);
+  const detail = document.getElementById("detail-" + key);
+  const isOpen = detail.classList.contains("open");
+  detail.classList.toggle("open", !isOpen);
+  row.classList.toggle("expanded", !isOpen);
 }
 
 function renderResults(result) {
@@ -590,8 +752,8 @@ function renderResults(result) {
     `${result.destName} · ${result.nights} night${result.nights === 1 ? "" : "s"} · ${result.travelers} traveler${result.travelers === 1 ? "" : "s"} · ${result.styleLabel}`;
 
   animateNumber(document.getElementById("resultTotal"), result.total);
-  document.getElementById("statDailyPerson").textContent = formatUSD(result.groundDailyPerPerson);
-  document.getElementById("statBuffer").textContent = formatUSD(result.categories.buffer);
+  document.getElementById("statDailyPerson").textContent = formatMoney(result.groundDailyPerPerson);
+  document.getElementById("statBuffer").textContent = formatMoney(result.categories.buffer);
 
   const order = ["flights", "accommodation", "food", "transport", "activities", "buffer"];
   const list = document.getElementById("breakdownList");
@@ -605,20 +767,29 @@ function renderResults(result) {
 
     const row = document.createElement("div");
     row.className = "breakdown-row";
+    row.id = "row-" + key;
+    row.onclick = () => toggleBreakdownDetail(key);
     row.innerHTML = `
       <div class="breakdown-icon" style="background:${meta.color}1A;">${meta.icon}</div>
       <div class="breakdown-mid">
         <div class="breakdown-label-row">
           <span class="breakdown-label">${meta.label}</span>
-          <span class="breakdown-amount">${formatUSD(amount)}</span>
+          <span class="breakdown-amount">${formatMoney(amount)}</span>
         </div>
         <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="background:${meta.color};" data-target="${pct}"></div></div>
       </div>
       <div class="breakdown-ring" style="background: conic-gradient(${meta.color} 0deg, ${meta.color} 0deg, rgba(15,30,61,0.07) 0deg);" data-pct="${pct}" data-color="${meta.color}">
         <span class="breakdown-pct">${pct}%</span>
       </div>
+      <span class="breakdown-chevron">▸</span>
     `;
     list.appendChild(row);
+
+    const detail = document.createElement("div");
+    detail.className = "breakdown-detail";
+    detail.id = "detail-" + key;
+    detail.innerHTML = renderTierDetailHTML(key, result);
+    list.appendChild(detail);
   });
 
   // trigger bar + ring animation on next frame
@@ -639,6 +810,13 @@ function renderResults(result) {
 
   document.getElementById("insightText").textContent = INSIGHTS[state.style === "budget" ? "budget" : (state.style === "comfort" ? "comfort" : "mid")];
 }
+
+document.addEventListener("DOMContentLoaded", populateCurrencySelect);
+if (document.getElementById("currencySelect")) populateCurrencySelect();
+document.getElementById("currencySelect") && document.getElementById("currencySelect").addEventListener("change", (e) => {
+  state.currency = e.target.value;
+  if (state.lastResult) renderResults(state.lastResult);
+});
 </script>
 </body>
 </html>
